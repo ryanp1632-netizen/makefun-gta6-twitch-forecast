@@ -21,9 +21,8 @@ const P = {
   wB: 0.35, // other big launches with rolling midnight unlocks
   wC: 0.08, // simultaneous-global, PC-only, live-service and free-to-play launches
   bw: 0.25, // Gaussian kernel width around each past launch's log-ratio
-  widen: 1.0,
+  widen: 0.9, // leave-one-out over the console-first launches gives 90% coverage here
   sf: 0.5, // width of the similarity window on the pre-release ramp feature (0 = off) // multiplier on the distance of each quantile from the median
-  ...JSON.parse(process.env.MF_P ?? '{}'),
 };
 
 interface Point { from: string; viewers: number }
