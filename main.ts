@@ -21,8 +21,9 @@ const P = {
   wB: 0.35, // other big launches with rolling midnight unlocks
   wC: 0.08, // simultaneous-global, PC-only, live-service and free-to-play launches
   bw: 0.25, // Gaussian kernel width around each past launch's log-ratio
-  widen: 0.9, // leave-one-out over the console-first launches gives 90% coverage here
-  sf: 0.5, // width of the similarity window on the pre-release ramp feature (0 = off) // multiplier on the distance of each quantile from the median
+  widen: 0.8, // multiplier on the distance of each quantile from the median (leave-one-out gives ~93% coverage)
+  taper: 0.2, // late hours' quantiles are tightened by up to this share (their log-ratios are steadier)
+  sf: 0.6, // width of the similarity window on the pre-release ramp feature (0 = off)
 };
 
 interface Point { from: string; viewers: number }
@@ -70,10 +71,10 @@ const mixQuantile = (xs: number[], ws: number[], total: number, tau: number): nu
   return (lo + hi) / 2;
 };
 
-/** ln(hour-1 level / mean of the hours 6..1 before the day start), or null with fewer than 3 such hours. */
+/** ln(hour-1 level / mean of the hours 12..1 before the day start, i.e. the rolling unlocks so far), or null with fewer than 3 such hours. */
 const ramp = (byHour: Map<number, number>, d0: number, y1: number): number | null => {
   const v: number[] = [];
-  for (let k = 1; k <= 6; k++) { const y = byHour.get(d0 - k * HOUR_MS); if (y !== undefined) v.push(y); }
+  for (let k = 1; k <= 12; k++) { const y = byHour.get(d0 - k * HOUR_MS); if (y !== undefined) v.push(y); }
   return v.length < 3 ? null : Math.log(Math.max(1, y1) / Math.max(1, v.reduce((a, b) => a + b, 0) / v.length));
 };
 
@@ -106,7 +107,7 @@ export const forecastCase = (c: Case): Array<{ hour: number; q: number[] }> => {
     const total = s.w.reduce((a, b) => a + b, 0);
     const qs = LEVELS.map((t) => mixQuantile(s.x, s.w, total, t));
     const med = qs[2]!;
-    const q = qs.map((v) => Math.round(p1 * Math.exp(med + (v - med) * P.widen) * 100) / 100);
+    const q = qs.map((v) => Math.round(p1 * Math.exp(med + (v - med) * P.widen * (1 - (P.taper * (hour - 2)) / 22)) * 100) / 100);
     for (let j = 1; j < 5; j++) q[j] = Math.max(q[j]!, q[j - 1]!);
     return { hour, q: q.map((v) => Math.max(v, 0.01)) };
   });
